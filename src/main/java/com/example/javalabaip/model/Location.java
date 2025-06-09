@@ -2,7 +2,9 @@ package com.example.javalabaip.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -16,6 +18,7 @@ public class Location {
     private Long id;
 
     @Column(name = "ip_address", nullable = false)
+    @NotBlank(message = "IP-адрес не может быть пустым")
     private String ipAddress;
 
     @Column(name = "city")
@@ -41,5 +44,5 @@ public class Location {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; // Связь с пользователем (FK)
+    private User user;
 }

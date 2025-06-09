@@ -5,6 +5,7 @@ import com.example.javalabaip.dto.UserDto;
 import com.example.javalabaip.model.User;
 import com.example.javalabaip.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<UserDto> findAll() {
-        String cacheKey = "findAll";
+        String cacheKey = "findAllUsers";
         if (cacheManager.containsUserListKey(cacheKey)) {
             return cacheManager.getUserList(cacheKey);
         }
@@ -51,48 +52,58 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserDto findByUsername(String username) {
-        String cacheKey = "findByUsername:" + username;
+        String cacheKey = "username:" + username;
         if (cacheManager.containsUserListKey(cacheKey)) {
-            return cacheManager.getUserList(cacheKey).get(0); // Assuming single result
+            List<UserDto> cachedUsers = cacheManager.getUserList(cacheKey);
+            if (!cachedUsers.isEmpty()) {
+                return cachedUsers.get(0);
+            }
         }
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with username: " + username));
         UserDto result = convertToDto(user);
+        cacheManager.putUser(user.getId(), result);
         cacheManager.putUserList(cacheKey, List.of(result));
-        cacheManager.putUser(user.getId(), result); // Also cache by ID
         return result;
     }
 
     @Transactional
-    public UserDto create(UserDto userDto) {
+    public UserDto create(@Valid UserDto userDto) {
         User user = new User();
         user.setUsername(userDto.getUsername());
         User savedUser = userRepository.save(user);
         UserDto result = convertToDto(savedUser);
-        cacheManager.clearAllCache(); // Clear all caches
+        cacheManager.putUser(savedUser.getId(), result);
+        cacheManager.clearUserListCache("findAllUsers");
         return result;
     }
 
     @Transactional
-    public UserDto update(Long id, UserDto userDto) {
+    public UserDto update(Long id, @Valid UserDto userDto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
         String oldUsername = user.getUsername();
         user.setUsername(userDto.getUsername());
         User updatedUser = userRepository.save(user);
         UserDto result = convertToDto(updatedUser);
-        cacheManager.clearAllCache(); // Clear all caches
+        cacheManager.removeUser(id);
+        cacheManager.putUser(id, result);
+        cacheManager.clearUserListCache("findAllUsers");
+        cacheManager.clearUserListCache("username:" + oldUsername);
+        cacheManager.putUserList("username:" + userDto.getUsername(), List.of(result));
         return result;
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new EntityNotFoundException("User not found with id: " + id);
-        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+        String username = user.getUsername();
         userRepository.deleteById(id);
-        cacheManager.clearAllCache(); // Clear all caches
+        cacheManager.removeUser(id);
+        cacheManager.clearUserListCache("findAllUsers");
+        cacheManager.clearUserListCache("username:" + username);
     }
 
     private UserDto convertToDto(User user) {

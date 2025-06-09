@@ -18,6 +18,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,7 +40,7 @@ public class IpLocationService {
 
     @Transactional(readOnly = true)
     public List<LocationResponseDto> findAll() {
-        String cacheKey = "findAll";
+        String cacheKey = "findAllLocations";
         if (cacheManager.containsLocationListKey(cacheKey)) {
             return cacheManager.getLocationList(cacheKey);
         }
@@ -88,6 +89,11 @@ public class IpLocationService {
         User user = userRepository.findByUsername(userDto.getUsername())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден: " + userDto.getUsername()));
 
+        LocationResponseDto cachedLocation = cacheManager.getLocationByIp(ipAddress);
+        if (cachedLocation != null) {
+            return cachedLocation;
+        }
+
         try {
             String apiUrl = "http://ip-api.com/json/" + ipAddress;
             Location location = restTemplate.getForObject(apiUrl, Location.class);
@@ -100,7 +106,10 @@ public class IpLocationService {
             location.setUser(user);
             Location savedLocation = locationRepository.save(location);
             LocationResponseDto result = convertToDto(savedLocation);
-            cacheManager.clearAllCache(); // Clear all caches
+            cacheManager.putLocation(savedLocation.getId(), result);
+            cacheManager.putLocationByIp(ipAddress, result);
+            cacheManager.clearLocationListCache("findAllLocations");
+            cacheManager.clearLocationListCache("findByUsername:" + userDto.getUsername());
             return result;
         } catch (HttpClientErrorException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Неверный IP-адрес: " + ipAddress, e);
@@ -110,7 +119,7 @@ public class IpLocationService {
     }
 
     @Transactional
-    public LocationResponseDto update(Long id, LocationResponseDto locationDto) {
+    public LocationResponseDto update(Long id, @Valid LocationResponseDto locationDto) {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Location not found with id: " + id));
         location.setIpAddress(locationDto.getIpAddress());
@@ -122,17 +131,25 @@ public class IpLocationService {
         location.setTimezone(locationDto.getTimezone());
         Location updatedLocation = locationRepository.save(location);
         LocationResponseDto result = convertToDto(updatedLocation);
-        cacheManager.clearAllCache(); // Clear all caches
+        cacheManager.removeLocation(id);
+        cacheManager.putLocation(id, result);
+        cacheManager.putLocationByIp(locationDto.getIpAddress(), result);
+        cacheManager.clearLocationListCache("findAllLocations");
+        cacheManager.clearLocationListCache("findByUsername:" + updatedLocation.getUser().getUsername());
         return result;
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!locationRepository.existsById(id)) {
-            throw new EntityNotFoundException("Location not found with id: " + id);
-        }
+        Location location = locationRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Location not found with id: " + id));
+        String username = location.getUser().getUsername();
+        String ipAddress = location.getIpAddress();
         locationRepository.deleteById(id);
-        cacheManager.clearAllCache(); // Clear all caches
+        cacheManager.removeLocation(id);
+        cacheManager.clearLocationByIpCache(ipAddress);
+        cacheManager.clearLocationListCache("findAllLocations");
+        cacheManager.clearLocationListCache("findByUsername:" + username);
     }
 
     private LocationResponseDto convertToDto(Location location) {

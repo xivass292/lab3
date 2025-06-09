@@ -4,7 +4,6 @@ import com.example.javalabaip.cache.CacheManager;
 import com.example.javalabaip.dto.LocationResponseDto;
 import com.example.javalabaip.dto.UserDto;
 import com.example.javalabaip.model.Location;
-import com.example.javalabaip.repository.LocationRepository;
 import com.example.javalabaip.service.IpLocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,13 +17,11 @@ import java.util.Optional;
 public class IpLocationController {
 
     private final IpLocationService ipLocationService;
-    private final LocationRepository locationRepository;
     private final CacheManager cacheManager;
 
     @Autowired
-    public IpLocationController(IpLocationService ipLocationService, LocationRepository locationRepository, CacheManager cacheManager) {
+    public IpLocationController(IpLocationService ipLocationService, CacheManager cacheManager) {
         this.ipLocationService = ipLocationService;
-        this.locationRepository = locationRepository;
         this.cacheManager = cacheManager;
     }
 

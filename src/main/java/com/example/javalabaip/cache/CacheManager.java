@@ -14,6 +14,7 @@ public class CacheManager {
     private final Map<Long, UserDto> userCache = new HashMap<>();
     private final Map<String, List<LocationResponseDto>> locationListCache = new HashMap<>();
     private final Map<Long, LocationResponseDto> locationCache = new HashMap<>();
+    private final Map<String, LocationResponseDto> locationByIpCache = new HashMap<>();
 
     public void putUserList(String key, List<UserDto> value) {
         userListCache.put(key, value);
@@ -25,6 +26,10 @@ public class CacheManager {
 
     public boolean containsUserListKey(String key) {
         return userListCache.containsKey(key);
+    }
+
+    public void clearUserListCache(String key) {
+        userListCache.remove(key);
     }
 
     public void putUser(Long key, UserDto value) {
@@ -55,6 +60,10 @@ public class CacheManager {
         return locationListCache.containsKey(key);
     }
 
+    public void clearLocationListCache(String key) {
+        locationListCache.remove(key);
+    }
+
     public void putLocation(Long key, LocationResponseDto value) {
         locationCache.put(key, value);
     }
@@ -71,18 +80,27 @@ public class CacheManager {
         locationCache.remove(key);
     }
 
-    public void clearUserCache() {
-        userListCache.clear();
-        userCache.clear();
+    public void putLocationByIp(String ipAddress, LocationResponseDto value) {
+        locationByIpCache.put(ipAddress, value);
     }
 
-    public void clearLocationCache() {
-        locationListCache.clear();
-        locationCache.clear();
+    public LocationResponseDto getLocationByIp(String ipAddress) {
+        return locationByIpCache.get(ipAddress);
+    }
+
+    public boolean containsLocationByIp(String ipAddress) {
+        return locationByIpCache.containsKey(ipAddress);
+    }
+
+    public void clearLocationByIpCache(String ipAddress) {
+        locationByIpCache.remove(ipAddress);
     }
 
     public void clearAllCache() {
-        clearUserCache();
-        clearLocationCache();
+        userListCache.clear();
+        userCache.clear();
+        locationListCache.clear();
+        locationCache.clear();
+        locationByIpCache.clear();
     }
 }
